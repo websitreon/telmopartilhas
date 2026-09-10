@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+<defs>
+  <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#050707"/><stop offset=".45" stop-color="#101818"/><stop offset="1" stop-color="#050808"/></linearGradient>
+  <linearGradient id="road" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#161d1e"/><stop offset=".55" stop-color="#0b1010"/><stop offset="1" stop-color="#182021"/></linearGradient>
+  <filter id="blur"><feGaussianBlur stdDeviation="18"/></filter>
+  <filter id="soft"><feGaussianBlur stdDeviation="4"/></filter>
+</defs>
+<rect width="1600" height="1000" fill="url(#bg)"/>
+<g opacity=".17" filter="url(#blur)"><circle cx="1260" cy="210" r="180" fill="#16cbd1"/><circle cx="1450" cy="720" r="240" fill="#ff7b1c"/><circle cx="440" cy="860" r="230" fill="#16cbd1"/></g>
+<path d="M-120 860 C270 500 510 450 790 560 C1110 690 1240 760 1730 510 L1730 1020 L-120 1020Z" fill="url(#road)"/>
+<path d="M-90 840 C270 510 515 470 820 580 C1120 690 1240 735 1690 500" fill="none" stroke="#334141" stroke-width="7"/>
+<path d="M-120 910 C260 575 520 530 810 640 C1110 755 1300 790 1730 560" fill="none" stroke="#0caab1" stroke-width="5" opacity=".9"/>
+<path d="M-100 935 C255 600 520 560 800 665 C1100 775 1300 820 1720 590" fill="none" stroke="#ff7b1c" stroke-width="3" opacity=".8"/>
+<g opacity=".25" stroke="#cde4e5">
+  <path d="M950 70 L1540 20" stroke-width="2"/><path d="M980 120 L1590 68" stroke-width="1"/><path d="M1030 168 L1600 120" stroke-width="1"/>
+</g>
+<g transform="translate(960 370) rotate(-7)">
+  <path d="M-130 55 L-60 5 L40 -5 L125 42 L135 72 L118 83 L-122 77Z" fill="#070909" stroke="#cbd7d8" stroke-width="4" opacity=".9"/>
+  <path d="M-70 9 L0 -28 L56 -20 L90 27 L-40 25Z" fill="#1e2a2a" stroke="#0caab1" stroke-width="4"/>
+  <circle cx="-88" cy="76" r="25" fill="#050606" stroke="#555" stroke-width="5"/><circle cx="105" cy="76" r="25" fill="#050606" stroke="#555" stroke-width="5"/>
+  <path d="M-124 39 L-164 33 L-178 48 L-126 55" fill="#0caab1"/><path d="M120 42 L160 35 L173 48 L124 57" fill="#ff7b1c"/>
+</g>
+<g opacity=".65" filter="url(#soft)" fill="#f4f7f7"><circle cx="735" cy="610" r="7"/><circle cx="700" cy="630" r="4"/><circle cx="660" cy="648" r="3"/></g>
+<text x="72" y="115" fill="#ffffff" font-family="Arial,Helvetica,sans-serif" font-size="22" font-weight="700" letter-spacing="7">TELMO PARTILHAS / RALLYCROSS</text>
+<text x="72" y="150" fill="#13cbd1" font-family="Arial,Helvetica,sans-serif" font-size="11" font-weight="700" letter-spacing="4">MOTORSPORT • FOTOGRAFIA • PORTUGAL</text>
+</svg>

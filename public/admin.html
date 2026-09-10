@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#070909">
+<title>Admin — Telmo Partilhas</title>
+<link rel="icon" href="assets/logo.png">
+<link rel="stylesheet" href="admin.css">
+<script src="admin.js" defer></script>
+</head>
+<body>
+<div id="login" class="login-screen">
+  <div class="login-card">
+    <img src="assets/logo.png" alt="Telmo Partilhas">
+    <p class="eyebrow">ÁREA RESERVADA</p>
+    <h1>ADMIN</h1>
+    <p class="muted">Gere o site, a galeria, o calendário, os parceiros e as notícias.</p>
+    <form id="loginForm">
+      <label>Palavra-passe<input id="password" type="password" autocomplete="current-password" required></label>
+      <button class="admin-btn primary" type="submit">ENTRAR</button>
+      <div id="loginError" class="error"></div>
+    </form>
+    <small>Palavra-passe inicial: <strong>admin123</strong></small>
+  </div>
+</div>
+
+<div id="app" class="app hidden">
+  <aside class="sidebar">
+    <div class="side-top"><img src="assets/logo.png" alt="Telmo Partilhas"><span>ADMIN</span></div>
+    <nav id="sideNav">
+      <button class="active" data-view="dashboard">Dashboard</button>
+      <button data-view="conteudo">Conteúdo</button>
+      <button data-view="fotografias">Fotografias</button>
+      <button data-view="provas">Calendário & Provas</button>
+      <button data-view="resultados">Resultados</button>
+      <button data-view="parceiros">Parceiros</button>
+      <button data-view="noticias">Notícias</button>
+      <button data-view="mensagens">Mensagens <b id="msgCount">0</b></button>
+      <button data-view="config">Configurações</button>
+    </nav>
+    <div class="side-bottom"><a href="index.html">← Ver site</a><button id="logout">Terminar sessão</button></div>
+  </aside>
+  <main class="main">
+    <header class="topbar">
+      <div><p class="eyebrow">TELMO PARTILHAS / ADMIN</p><h2 id="viewTitle">Dashboard</h2></div>
+      <div id="syncState" class="sync">● <b>Ligado</b></div>
+    </header>
+    <div id="view"></div>
+  </main>
+</div>
+<div id="toast" class="toast"></div>
+
+</body>
+</html>

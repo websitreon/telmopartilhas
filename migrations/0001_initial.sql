@@ -1,0 +1,15 @@
+CREATE TABLE IF NOT EXISTS site_state (
+  id INTEGER PRIMARY KEY,
+  payload TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS messages (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  subject TEXT,
+  message TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  read INTEGER NOT NULL DEFAULT 0
+);
