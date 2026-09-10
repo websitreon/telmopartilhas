@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "telmo-partilhas",
+  "name": "telmopartilhas",
   "main": "src/index.js",
   "compatibility_date": "2026-09-10",
   "assets": {
@@ -10,8 +10,7 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "telmo-partilhas-db",
-      "database_id": "53764e00-40f9-4c9f-8b77-0c5d3ec54574"
+      "database_name": "telmo-partilhas-db"
     }
   ],
   "r2_buckets": [
