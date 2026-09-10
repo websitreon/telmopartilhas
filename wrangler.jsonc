@@ -1,0 +1,9 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "telmo-partilhas",
+  "main": "src/index.js",
+  "compatibility_date": "2026-09-10",
+  "assets": { "directory": "./public", "binding": "ASSETS" },
+  "d1_databases": [{ "binding": "DB", "database_name": "telmo-partilhas-db", "database_id": "REPLACE_AFTER_CREATE" }],
+  "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "telmo-partilhas-media" }]
+}
