@@ -1,0 +1,6 @@
+{
+  "name":"telmo-partilhas-cloudflare",
+  "private":true,
+  "scripts":{"dev":"wrangler dev","deploy":"wrangler deploy","db:local":"wrangler d1 migrations apply telmo-partilhas-db --local","db:remote":"wrangler d1 migrations apply telmo-partilhas-db --remote"},
+  "devDependencies":{"wrangler":"latest"}
+}
