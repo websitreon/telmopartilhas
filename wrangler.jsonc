@@ -4,6 +4,6 @@
   "main": "src/index.js",
   "compatibility_date": "2026-09-10",
   "assets": { "directory": "./public", "binding": "ASSETS" },
-  "d1_databases": [{ "binding": "DB", "database_name": "telmo-partilhas-db", "database_id": "REPLACE_AFTER_CREATE" }],
+  "d1_databases": [{ "binding": "DB", "database_name": "telmo-partilhas-db", "53764ae0-40f9-4c9f-8b77-0c5d3ec54574": "REPLACE_AFTER_CREATE" }],
   "r2_buckets": [{ "binding": "MEDIA", "bucket_name": "telmo-partilhas-media" }]
 }
