@@ -1,150 +1,135 @@
-const JSON_HEADERS = { 'content-type': 'application/json; charset=utf-8' };
-const ALLOWED_ORIGINS = new Set(['null']);
-
-function json(data, status = 200, extra = {}) {
-  return new Response(JSON.stringify(data), { status, headers: { ...JSON_HEADERS, ...extra } });
-}
-function base64url(bytes) {
-  let s = '';
-  const arr = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
-  for (const b of arr) s += String.fromCharCode(b);
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
-}
-function unbase64url(s) {
-  const padded = s.replace(/-/g, '+').replace(/_/g, '/') + '==='.slice((s.length + 3) % 4);
-  const bin = atob(padded); const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
-  return out;
-}
-async function hmac(secret, message) {
-  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign','verify']);
-  return new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(message)));
-}
-async function issueToken(env) {
-  const payload = `${Date.now() + 1000 * 60 * 60 * 12}`;
-  const sig = base64url(await hmac(env.ADMIN_SESSION_SECRET, payload));
-  return `${base64url(new TextEncoder().encode(payload))}.${sig}`;
-}
-async function verifyToken(request, env) {
-  const header = request.headers.get('authorization') || '';
-  if (!header.startsWith('Bearer ')) return false;
-  const token = header.slice(7); const [p, sig] = token.split('.');
-  if (!p || !sig) return false;
-  const payload = new TextDecoder().decode(unbase64url(p));
-  if (Number(payload) < Date.now()) return false;
-  const expected = await hmac(env.ADMIN_SESSION_SECRET, payload);
-  const given = unbase64url(sig);
-  if (expected.length !== given.length) return false;
-  let diff = 0; for (let i = 0; i < expected.length; i++) diff |= expected[i] ^ given[i];
-  return diff === 0;
-}
-function cleanObj(v) { return v == null ? '' : String(v); }
-function int(v) { return Number.isFinite(Number(v)) ? Number(v) : 0; }
-
-async function readCollection(db, table, mapper) {
-  const { results } = await db.prepare(`SELECT * FROM ${table}`).all();
-  return results.map(mapper);
-}
-async function readSite(db) {
-  const [settingsRows, textRows, statRows, races, photos, partners, news, results] = await Promise.all([
-    db.prepare('SELECT key,value FROM site_settings').all(),
-    db.prepare('SELECT key,value FROM site_texts').all(),
-    db.prepare('SELECT key,value FROM site_stats').all(),
-    readCollection(db, 'races', r => ({...r})),
-    readCollection(db, 'photos', r => ({id:r.id,title:r.title,category:r.category,event:r.event,driver:r.driver,date:r.date,location:r.location,description:r.description,image:r.image,featured:!!r.featured,order:r.sort_order})),
-    readCollection(db, 'partners', r => ({id:r.id,name:r.name,logo:r.logo,description:r.description,website:r.website,instagram:r.instagram,facebook:r.facebook,category:r.category,order:r.sort_order,active:!!r.active})),
-    readCollection(db, 'news', r => ({...r,published:!!r.published})),
-    readCollection(db, 'results', r => ({...r}))
-  ]);
-  const settings = Object.fromEntries(settingsRows.results.map(x => [x.key, x.value]));
-  const texts = Object.fromEntries(textRows.results.map(x => [x.key, x.value]));
-  const stats = Object.fromEntries(statRows.results.map(x => [x.key, Number(x.value) || 0]));
-  return { settings, texts, stats, races, photos, partners, news, results, messages: [] };
-}
-
-const FALLBACK = {
-  settings:{siteName:'Telmo Partilhas',logo:'assets/logo.png',email:'telmo@example.com',instagram:'#',facebook:'#',location:'Portugal'},
+const STORE_KEY='telmo_partilhas_data_v1';
+const defaults={
+  settings:{siteName:'Telmo Partilhas',logo:'assets/logo.png',email:'telmo@example.com',instagram:'#',facebook:'#',location:'Portugal',password:'admin123'},
   texts:{heroTitle:'O RALLYCROSS ATRAVÉS DA MINHA LENTE',heroSubtitle:'Fotografia de Rallycross, Motorsport e momentos que ficam para a história.',aboutTitle:'SOBRE O MEU TRABALHO',aboutText:'Telmo Partilhas acompanha provas, pilotos, equipas e eventos de Motorsport através da fotografia, procurando a velocidade, a emoção e os detalhes que tornam cada prova única.',contactText:'Para cobertura fotográfica, parcerias, media ou colaboração, entra em contacto.'},
   stats:{races:0,photos:0,events:0,partners:0},races:[],photos:[],partners:[],news:[],results:[],messages:[]
 };
-
-async function upsertAll(db, d) {
-  const stmts = [];
-  for (const [k,v] of Object.entries(d.settings||{})) stmts.push(db.prepare('INSERT INTO site_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind(k, cleanObj(v)));
-  for (const [k,v] of Object.entries(d.texts||{})) stmts.push(db.prepare('INSERT INTO site_texts(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind(k, cleanObj(v)));
-  for (const [k,v] of Object.entries(d.stats||{})) stmts.push(db.prepare('INSERT INTO site_stats(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').bind(k, int(v)));
-  stmts.push(db.prepare('DELETE FROM races'), db.prepare('DELETE FROM photos'), db.prepare('DELETE FROM partners'), db.prepare('DELETE FROM news'), db.prepare('DELETE FROM results'));
-  for (const r of d.races||[]) stmts.push(db.prepare('INSERT INTO races(id,name,date,endDate,location,circuit,country,category,status,image,description,link,result) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)').bind(r.id,r.name,r.date,r.endDate||'',r.location||'',r.circuit||'',r.country||'',r.category||'',r.status||'',r.image||'',r.description||'',r.link||'',r.result||''));
-  for (const p of d.photos||[]) stmts.push(db.prepare('INSERT INTO photos(id,title,category,event,driver,date,location,description,image,featured,sort_order) VALUES(?,?,?,?,?,?,?,?,?,?,?)').bind(p.id,p.title,p.category||'',p.event||'',p.driver||'',p.date||'',p.location||'',p.description||'',p.image||'',p.featured?1:0,int(p.order)));
-  for (const p of d.partners||[]) stmts.push(db.prepare('INSERT INTO partners(id,name,logo,description,website,instagram,facebook,category,sort_order,active) VALUES(?,?,?,?,?,?,?,?,?,?)').bind(p.id,p.name,p.logo||'',p.description||'',p.website||'',p.instagram||'',p.facebook||'',p.category||'',int(p.order),p.active?1:0));
-  for (const n of d.news||[]) stmts.push(db.prepare('INSERT INTO news(id,title,summary,content,date,category,image,published) VALUES(?,?,?,?,?,?,?,?)').bind(n.id,n.title,n.summary||'',n.content||'',n.date||'',n.category||'',n.image||'',n.published?1:0));
-  for (const r of d.results||[]) stmts.push(db.prepare('INSERT INTO results(id,race,date,driver,category,position,time,notes) VALUES(?,?,?,?,?,?,?,?)').bind(r.id,r.race||'',r.date||'',r.driver||'',r.category||'',r.position||'',r.time||'',r.notes||''));
-  // D1 batch is atomic per request in practical terms for this workload.
-  await db.batch(stmts);
+function clone(v){return JSON.parse(JSON.stringify(v))}
+let memoryStore={};
+function storageGet(key){try{return window.localStorage.getItem(key)}catch(e){return memoryStore[key]??null}}
+function storageSet(key,value){try{window.localStorage.setItem(key,value)}catch(e){memoryStore[key]=value}}
+function sessionGet(key){try{return window.sessionStorage.getItem(key)}catch(e){return memoryStore['session:'+key]??null}}
+function sessionSet(key,value){try{window.sessionStorage.setItem(key,value)}catch(e){memoryStore['session:'+key]=value}}
+function sessionRemove(key){try{window.sessionStorage.removeItem(key)}catch(e){delete memoryStore['session:'+key]}}
+function loadData(){try{const raw=storageGet(STORE_KEY);if(!raw)return clone(defaults);const saved=JSON.parse(raw)||{};return { ...clone(defaults), ...saved, settings:{...clone(defaults.settings),...(saved.settings||{})}, texts:{...clone(defaults.texts),...(saved.texts||{})}, stats:{...clone(defaults.stats),...(saved.stats||{})}, races:Array.isArray(saved.races)?saved.races:[], photos:Array.isArray(saved.photos)?saved.photos:[], partners:Array.isArray(saved.partners)?saved.partners:[], news:Array.isArray(saved.news)?saved.news:[], results:Array.isArray(saved.results)?saved.results:[], messages:Array.isArray(saved.messages)?saved.messages:[] }}catch(e){return clone(defaults)}}
+let data=loadData();
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]));
+const fmt=d=>new Intl.DateTimeFormat('pt-PT',{day:'2-digit',month:'2-digit',year:'numeric'}).format(new Date(d+'T12:00:00'));
+async function cloudSave(msg='Guardado na Cloudflare'){storageSet(STORE_KEY,JSON.stringify(data)); $('#saveIndicator').textContent='A guardar…'; try { const token=sessionGet('tp_admin_token'); const r=await fetch('/api/admin/data',{method:'PUT',headers:{'content-type':'application/json', ...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify(data)}); if(!r.ok) throw new Error('Falha ao guardar na Cloudflare'); $('#saveIndicator').textContent=msg; showToast(msg); } catch(e){ $('#saveIndicator').textContent='Erro ao guardar online'; showToast(e.message); } }
+function showToast(msg){$('#toast').textContent=msg;$('#toast').classList.add('show');setTimeout(()=>$('#toast').classList.remove('show'),1500)}
+function uid(prefix){return prefix+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function imageField(name,value=''){return `<div class="field full"><label>${name}<input id="fieldImage" type="text" value="${esc(value)}" placeholder="Caminho local, ex.: assets/foto.jpg"></label><small style="color:#666">Para ficheiros escolhidos no computador, o browser guarda o ficheiro como base64 localmente. A opção abaixo faz isso automaticamente.</small><input id="imageFile" type="file" accept="image/*"></div>`}
+async function uploadFile(file){const token=sessionGet('tp_admin_token');if(!token)throw new Error('Sessão de administrador terminada.');const fd=new FormData();fd.append('file',file);const r=await fetch('/api/upload',{method:'POST',headers:{Authorization:'Bearer '+token},body:fd});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Falha no upload.');return j.url;}
+function setActive(view){$$('.admin-view').forEach(v=>v.hidden=v.id!=='view-'+view);$$('#adminNav button').forEach(b=>b.classList.toggle('active',b.dataset.view===view));$('#viewTitle').textContent={dashboard:'Dashboard',content:'Conteúdo',photos:'Fotografias',calendar:'Calendário',results:'Resultados',partners:'Parceiros',news:'Notícias',contact:'Contactos',social:'Redes Sociais',settings:'Configurações'}[view]||view;render(view)}
+function render(view){({dashboard:renderDashboard,content:renderContent,photos:renderPhotos,calendar:renderCalendar,results:renderResults,partners:renderPartners,news:renderNews,contact:renderContact,social:renderSocial,settings:renderSettings}[view])()}
+function renderDashboard(){
+  const stats=[['Fotografias',data.photos.length],['Provas',data.races.length],['Parceiros',data.partners.filter(p=>p.active).length],['Notícias',data.news.filter(n=>n.published).length],['Mensagens',data.messages.length]];
+  const next=data.races.slice().sort((a,b)=>a.date.localeCompare(b.date))[0];
+  const cats={};data.photos.forEach(p=>cats[p.category]=(cats[p.category]||0)+1);
+  $('#view-dashboard').innerHTML=`<div class="grid-cards">${stats.map(x=>`<div class="metric"><b>${x[1]}</b><span>${x[0]}</span></div>`).join('')}</div>
+  <div class="two-col" style="margin-top:16px"><div class="panel"><h2>Próxima prova</h2><p style="font:700 28px 'Barlow Condensed';margin:0">${esc(next?.name||'Sem provas')}</p><p style="color:#777">${next?fmt(next.date)+' • '+esc(next.location):''}</p></div>
+  <div class="panel"><h2>Atividade</h2><div class="chips"><span class="chip">Última gravação: ${new Date().toLocaleString('pt-PT')}</span><span class="chip">Dados na Cloudflare D1</span></div></div></div>
+  <div class="panel"><h2>Fotografias por categoria</h2><div class="chart">${Object.entries(cats).map(([k,v])=>`<div class="bar" style="height:${Math.max(12,(v/Math.max(...Object.values(cats)))*180)}px"><span>${esc(k)}</span></div>`).join('')||'<div class="empty">Ainda sem fotografias.</div>'}</div></div>
+  <div class="panel"><h2>Últimas mensagens</h2>${data.messages.slice(-5).reverse().map(m=>`<div style="padding:12px 0;border-bottom:1px solid #222"><strong>${esc(m.name)}</strong> — ${esc(m.subject)}<div style="color:#666;font-size:10px">${esc(m.email)} • ${new Date(m.date).toLocaleString('pt-PT')}</div><div style="color:#aaa;margin-top:6px">${esc(m.message)}</div></div>`).join('')||'<div class="empty">Sem mensagens.</div>'}</div>`
 }
-
-async function handleApi(request, env) {
-  const url = new URL(request.url);
-  const path = url.pathname;
-  if (path === '/api/auth/login' && request.method === 'POST') {
-    const body = await request.json().catch(() => ({}));
-    if (!env.ADMIN_PASSWORD || body.password !== env.ADMIN_PASSWORD) return json({error:'Palavra-passe incorreta.'},401);
-    return json({token:await issueToken(env)});
-  }
-  if (path === '/api/site' && request.method === 'GET') {
-    let site = FALLBACK;
-    try {
-      site = await readSite(env.DB);
-      if (!site.races.length && !site.photos.length && !site.news.length) site = FALLBACK;
-    } catch (_) {}
-    return json(site);
-  }
-  if (path === '/api/messages' && request.method === 'POST') {
-    const body = await request.json().catch(() => ({}));
-    const id = crypto.randomUUID();
-    await env.DB.prepare('INSERT INTO messages(id,name,email,subject,message,created_at,read) VALUES(?,?,?,?,?,?,0)').bind(id,cleanObj(body.name),cleanObj(body.email),cleanObj(body.subject),cleanObj(body.message),new Date().toISOString()).run();
-    return json({ok:true});
-  }
-  const authed = await verifyToken(request, env);
-  if (!authed) return json({error:'Não autorizado.'},401);
-  if (path === '/api/admin/data' && request.method === 'GET') {
-    const site = await readSite(env.DB);
-    const {results:messages} = await env.DB.prepare('SELECT id,name,email,subject,message,created_at AS date,read FROM messages ORDER BY created_at DESC').all();
-    site.messages = messages.map(m=>({...m,read:!!m.read}));
-    return json(site);
-  }
-  if (path === '/api/admin/data' && request.method === 'PUT') {
-    const body = await request.json();
-    await upsertAll(env.DB, body);
-    return json({ok:true});
-  }
-  if (path === '/api/upload' && request.method === 'POST') {
-    const form = await request.formData(); const file = form.get('file');
-    if (!(file instanceof File)) return json({error:'Ficheiro em falta.'},400);
-    if (!file.type.startsWith('image/')) return json({error:'Apenas imagens são aceites.'},415);
-    if (file.size > 15 * 1024 * 1024) return json({error:'A imagem ultrapassa 15 MB.'},413);
-    const ext = (file.name.split('.').pop() || 'jpg').replace(/[^a-z0-9]/gi,'').toLowerCase() || 'jpg';
-    const key = `uploads/${new Date().toISOString().slice(0,10)}/${crypto.randomUUID()}.${ext}`;
-    await env.MEDIA.put(key,file.stream(),{httpMetadata:{contentType:file.type,cacheControl:'public, max-age=31536000, immutable'}});
-    return json({ok:true,url:`/media/${key}`});
-  }
-  if (path.startsWith('/api/')) return json({error:'Rota não encontrada.'},404);
+function renderContent(){
+  const t=data.texts,s=data.stats;
+  $('#view-content').innerHTML=`<div class="panel"><h2>Textos do website</h2><form id="contentForm" class="form-grid">
+  ${[['heroTitle','Hero Title'],['heroSubtitle','Hero Subtitle'],['aboutTitle','About Título'],['aboutText','About Texto'],['contactText','Contact Texto']].map(([k,l])=>`<div class="field ${k.includes('Text')||k.includes('Subtitle')||k==='heroTitle'?'full':''}"><label>${l}<textarea name="${k}">${esc(t[k]||'')}</textarea></label></div>`).join('')}
+  <div class="field"><label>Provas acompanhadas<input name="races" type="number" value="${data.stats.races||0}"></label></div><div class="field"><label>Fotografias<input name="photos" type="number" value="${data.stats.photos||0}"></label></div><div class="field"><label>Eventos<input name="events" type="number" value="${data.stats.events||0}"></label></div><div class="field"><label>Parceiros<input name="partners" type="number" value="${data.stats.partners||0}"></label></div>
+  <div class="field full"><button class="admin-btn primary">GUARDAR ALTERAÇÕES</button></div></form></div>`
+  $('#contentForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.currentTarget);['heroTitle','heroSubtitle','aboutTitle','aboutText','contactText'].forEach(k=>data.texts[k]=f.get(k));['races','photos','events','partners'].forEach(k=>data.stats[k]=Number(f.get(k)||0));save();alert('Atualizado. Abre index.html para ver.')}
 }
-
-export default {
-  async fetch(request, env, ctx) {
-    const url = new URL(request.url);
-    if (url.pathname.startsWith('/api/')) {
-      try { return await handleApi(request, env); }
-      catch (err) { console.error(err); return json({error:'Erro interno.',detail:err?.message||String(err)},500); }
-    }
-    if (url.pathname.startsWith('/media/')) {
-      const key = decodeURIComponent(url.pathname.slice('/media/'.length));
-      const obj = await env.MEDIA.get(key);
-      if (!obj) return new Response('Imagem não encontrada.', {status:404});
-      const headers = new Headers(); obj.writeHttpMetadata(headers); headers.set('etag', obj.httpEtag); headers.set('cache-control','public, max-age=31536000, immutable');
-      return new Response(obj.body,{headers});
-    }
-    return env.ASSETS.fetch(request);
+let editId=null;
+function renderPhotos(){
+  $('#view-photos').innerHTML=`<div class="toolbar"><h2 style="font:700 32px 'Barlow Condensed';margin:0">FOTOGRAFIAS</h2><button class="admin-btn primary" id="addPhoto">+ ADICIONAR</button></div><div id="photoEditor"></div><div class="preview-grid">${data.photos.sort((a,b)=>(a.order||0)-(b.order||0)).map(p=>`<div class="preview-card"><img src="${esc(p.image||'assets/placeholder-rally.svg')}"><div class="pcopy"><strong>${esc(p.title)}</strong><small>${esc(p.category)} • ${p.featured?'DESTAQUE':''}</small><div style="display:flex;gap:6px;margin-top:9px"><button class="admin-btn" data-edit-photo="${p.id}">EDITAR</button><button class="admin-btn danger" data-del-photo="${p.id}">APAGAR</button></div></div></div>`).join('')||'<div class="empty">Sem fotografias.</div>'}</div>`
+  $('#addPhoto').onclick=()=>photoForm();$$('[data-edit-photo]').forEach(b=>b.onclick=()=>photoForm(b.dataset.editPhoto));$$('[data-del-photo]').forEach(b=>b.onclick=()=>{if(confirm('Apagar fotografia?')){data.photos=data.photos.filter(p=>p.id!==b.dataset.delPhoto);save();renderPhotos()}})
+}
+function photoForm(id){
+  const p=id?data.photos.find(x=>x.id===id):{id:uid('p'),title:'',category:'Rallycross',event:'',driver:'',date:'',location:'',description:'',image:'',featured:false,order:data.photos.length+1};editId=id||p.id;
+  $('#photoEditor').innerHTML=`<div class="panel"><h3>${id?'Editar':'Adicionar'} fotografia</h3><form id="photoForm" class="form-grid">
+  <div class="field"><label>Título<input name="title" value="${esc(p.title)}" required></label></div><div class="field"><label>Categoria<select name="category">${['Rallycross','Motorsport','Eventos','Pilotos','Equipas','Circuitos','Backstage','Destaques'].map(v=>`<option ${p.category===v?'selected':''}>${v}</option>`).join('')}</select></label></div>
+  <div class="field"><label>Evento<input name="event" value="${esc(p.event)}"></label></div><div class="field"><label>Piloto / Equipa<input name="driver" value="${esc(p.driver)}"></label></div>
+  <div class="field"><label>Data<input name="date" type="date" value="${esc(p.date)}"></label></div><div class="field"><label>Localização<input name="location" value="${esc(p.location)}"></label></div>
+  <div class="field"><label>Ordem<input name="order" type="number" value="${p.order||1}"></label></div><label class="toggle"><input name="featured" type="checkbox" ${p.featured?'checked':''}> Shot of the Week</label>
+  <div class="field full"><label>Descrição<textarea name="description">${esc(p.description)}</textarea></label></div>
+  ${imageField('Imagem',p.image)}
+  <div class="field full"><button class="admin-btn primary">GUARDAR FOTOGRAFIA</button> <button type="button" class="admin-btn" id="cancelEdit">CANCELAR</button></div></form><img class="preview-img" id="photoPreview" src="${esc(p.image||'assets/placeholder-rally.svg')}" alt=""></div>`;
+  $('#cancelEdit').onclick=()=>$('#photoEditor').innerHTML='';
+  $('#imageFile').onchange=async e=>{const f=e.target.files[0];if(f){try{const url=await uploadFile(f);$('#fieldImage').value=url;$('#photoPreview').src=url;showToast('Imagem enviada para o R2')}catch(err){showToast(err.message)}}}
+  $('#fieldImage').oninput=e=>$('#photoPreview').src=e.target.value||'assets/placeholder-rally.svg';
+  $('#photoForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.currentTarget);const obj={id:p.id,title:f.get('title'),category:f.get('category'),event:f.get('event'),driver:f.get('driver'),date:f.get('date'),location:f.get('location'),description:f.get('description'),image:f.get('fieldImage')||p.image,featured:f.get('featured')==='on',order:Number(f.get('order')||1)};const idx=data.photos.findIndex(x=>x.id===p.id);if(idx>=0)data.photos[idx]=obj;else data.photos.push(obj);save();renderPhotos()}
+}
+function renderCalendar(){
+  $('#view-calendar').innerHTML=`<div class="toolbar"><h2 style="font:700 32px 'Barlow Condensed';margin:0">PROVAS / CALENDÁRIO</h2><button class="admin-btn primary" id="addRace">+ NOVA PROVA</button></div><div id="raceEditor"></div><div class="table-wrap"><table class="admin-table"><thead><tr><th>DATA</th><th>PROVA</th><th>LOCAL</th><th>CATEGORIA</th><th>ESTADO</th><th>AÇÕES</th></tr></thead><tbody>${data.races.sort((a,b)=>a.date.localeCompare(b.date)).map(r=>`<tr><td>${fmt(r.date)}</td><td>${esc(r.name)}</td><td>${esc(r.location)}</td><td>${esc(r.category)}</td><td>${esc(r.status)}</td><td><button class="admin-btn" data-edit-race="${r.id}">EDITAR</button> <button class="admin-btn" data-dup-race="${r.id}">DUPLICAR</button> <button class="admin-btn danger" data-del-race="${r.id}">APAGAR</button></td></tr>`).join('')}</tbody></table></div>`
+  $('#addRace').onclick=()=>raceForm();$$('[data-edit-race]').forEach(b=>b.onclick=()=>raceForm(b.dataset.editRace));$$('[data-dup-race]').forEach(b=>b.onclick=()=>{const r=clone(data.races.find(x=>x.id===b.dataset.dupRace));r.id=uid('r');r.name+=' (CÓPIA)';data.races.push(r);save();renderCalendar()});$$('[data-del-race]').forEach(b=>b.onclick=()=>{if(confirm('Apagar prova?')){data.races=data.races.filter(r=>r.id!==b.dataset.delRace);save();renderCalendar()}})
+}
+function raceForm(id){
+  const r=id?data.races.find(x=>x.id===id):{id:uid('r'),name:'',date:'',endDate:'',location:'',circuit:'',country:'Portugal',category:'',status:'next',image:'assets/placeholder-rally.svg',description:'',link:'',result:''};
+  $('#raceEditor').innerHTML=`<div class="panel"><h3>${id?'Editar':'Criar'} prova</h3><form id="raceForm" class="form-grid">
+  <div class="field"><label>Nome<input name="name" value="${esc(r.name)}" required></label></div><div class="field"><label>Data<input name="date" type="date" value="${esc(r.date)}" required></label></div><div class="field"><label>Data final<input name="endDate" type="date" value="${esc(r.endDate||r.date)}"></label></div><div class="field"><label>Local<input name="location" value="${esc(r.location)}"></label></div><div class="field"><label>Circuito<input name="circuit" value="${esc(r.circuit)}"></label></div><div class="field"><label>País<input name="country" value="${esc(r.country)}"></label></div><div class="field"><label>Categoria<input name="category" value="${esc(r.category)}"></label></div><div class="field"><label>Estado<select name="status">${['next','upcoming','featured','done'].map(v=>`<option ${r.status===v?'selected':''}>${v}</option>`).join('')}</select></label></div><div class="field"><label>Link<input name="link" value="${esc(r.link)}"></label></div><div class="field"><label>Resultado<input name="result" value="${esc(r.result)}"></label></div><div class="field full"><label>Descrição<textarea name="description">${esc(r.description)}</textarea></label></div>${imageField('Imagem',r.image)}<div class="field full"><button class="admin-btn primary">GUARDAR PROVA</button> <button type="button" class="admin-btn" id="cancelRace">CANCELAR</button></div></form><img class="preview-img" id="racePreview" src="${esc(r.image||'assets/placeholder-rally.svg')}"></div>`;
+  $('#cancelRace').onclick=()=>$('#raceEditor').innerHTML='';$('#imageFile').onchange=async e=>{const f=e.target.files[0];if(f){try{const u=await uploadFile(f);$('#fieldImage').value=u;$('#racePreview').src=u;showToast('Imagem enviada para o R2')}catch(err){showToast(err.message)}}};$('#fieldImage').oninput=e=>$('#racePreview').src=e.target.value||'assets/placeholder-rally.svg';
+  $('#raceForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.currentTarget);const o={...r,name:f.get('name'),date:f.get('date'),endDate:f.get('endDate'),location:f.get('location'),circuit:f.get('circuit'),country:f.get('country'),category:f.get('category'),status:f.get('status'),link:f.get('link'),result:f.get('result'),description:f.get('description'),image:f.get('fieldImage')||r.image};const i=data.races.findIndex(x=>x.id===r.id);if(i>=0)data.races[i]=o;else data.races.push(o);save();renderCalendar()}
+}
+function renderResults(){ $('#view-results').innerHTML=`<div class="toolbar"><h2 style="font:700 32px 'Barlow Condensed';margin:0">RESULTADOS</h2><button class="admin-btn primary" id="addResult">+ NOVO RESULTADO</button></div><div id="resultEditor"></div><div class="table-wrap"><table class="admin-table"><thead><tr><th>PROVA</th><th>DATA</th><th>PILOTO</th><th>CATEGORIA</th><th>POS.</th><th>ACÇÕES</th></tr></thead><tbody>${data.results.map(r=>`<tr><td>${esc(r.race)}</td><td>${fmt(r.date)}</td><td>${esc(r.driver)}</td><td>${esc(r.category)}</td><td>${esc(r.position)}</td><td><button class="admin-btn" data-edit-result="${r.id}">EDITAR</button> <button class="admin-btn danger" data-del-result="${r.id}">APAGAR</button></td></tr>`).join('')}</tbody></table></div>`;$('#addResult').onclick=()=>resultForm();$$('[data-edit-result]').forEach(b=>b.onclick=()=>resultForm(b.dataset.editResult));$$('[data-del-result]').forEach(b=>b.onclick=()=>{if(confirm('Apagar resultado?')){data.results=data.results.filter(x=>x.id!==b.dataset.delResult);save();renderResults()}})}
+function resultForm(id){
+  const r=id?data.results.find(x=>x.id===id):{id:uid('res'),race:'',date:'',driver:'',category:'',position:'',time:'',notes:''};
+  $('#resultEditor').innerHTML=`<div class="panel"><form id="resultForm" class="form-grid">
+    <div class="field"><label>Prova<input name="race" value="${esc(r.race||'')}"></label></div>
+    <div class="field"><label>Data<input name="date" type="date" value="${esc(r.date||'')}"></label></div>
+    <div class="field"><label>Piloto<input name="driver" value="${esc(r.driver||'')}"></label></div>
+    <div class="field"><label>Categoria<input name="category" value="${esc(r.category||'')}"></label></div>
+    <div class="field"><label>Posição<input name="position" value="${esc(r.position||'')}"></label></div>
+    <div class="field"><label>Tempo<input name="time" value="${esc(r.time||'')}"></label></div>
+    <div class="field full"><label>Observações<textarea name="notes">${esc(r.notes||'')}</textarea></label></div>
+    <div class="field full"><button class="admin-btn primary">GUARDAR</button></div>
+  </form></div>`;
+  $('#resultForm').onsubmit=e=>{
+    e.preventDefault();
+    const f=new FormData(e.currentTarget),o={...r};
+    for(const [k,v] of f.entries())o[k]=v;
+    const i=data.results.findIndex(x=>x.id===r.id);
+    if(i>=0)data.results[i]=o;else data.results.push(o);
+    save();renderResults();
   }
-};
+}
+function renderPartners(){ $('#view-partners').innerHTML=`<div class="toolbar"><h2 style="font:700 32px 'Barlow Condensed';margin:0">PARCEIROS</h2><button class="admin-btn primary" id="addPartner">+ NOVO PARCEIRO</button></div><div id="partnerEditor"></div><div class="table-wrap"><table class="admin-table"><thead><tr><th>LOGO</th><th>NOME</th><th>CATEGORIA</th><th>ORDEM</th><th>ATIVO</th><th>AÇÕES</th></tr></thead><tbody>${data.partners.sort((a,b)=>(a.order||0)-(b.order||0)).map(p=>`<tr><td><img class="thumb" src="${esc(p.logo||'assets/logo.png')}"></td><td>${esc(p.name)}</td><td>${esc(p.category)}</td><td>${p.order}</td><td>${p.active?'SIM':'NÃO'}</td><td><button class="admin-btn" data-edit-partner="${p.id}">EDITAR</button> <button class="admin-btn danger" data-del-partner="${p.id}">APAGAR</button></td></tr>`).join('')}</tbody></table></div>`;$('#addPartner').onclick=()=>partnerForm();$$('[data-edit-partner]').forEach(b=>b.onclick=()=>partnerForm(b.dataset.editPartner));$$('[data-del-partner]').forEach(b=>b.onclick=()=>{if(confirm('Apagar parceiro?')){data.partners=data.partners.filter(x=>x.id!==b.dataset.delPartner);save();renderPartners()}})}
+function partnerForm(id){const p=id?data.partners.find(x=>x.id===id):{id:uid('pa'),name:'',logo:'',description:'',website:'',instagram:'',facebook:'',category:'OFFICIAL PARTNER',order:data.partners.length+1,active:true};$('#partnerEditor').innerHTML=`<div class="panel"><form id="partnerForm" class="form-grid"><div class="field"><label>Nome<input name="name" value="${esc(p.name)}"></label></div><div class="field"><label>Categoria<select name="category">${['MAIN PARTNER','OFFICIAL PARTNER','SUPPORTER'].map(x=>`<option ${p.category===x?'selected':''}>${x}</option>`).join('')}</select></label></div><div class="field"><label>Website<input name="website" value="${esc(p.website)}"></label></div><div class="field"><label>Instagram<input name="instagram" value="${esc(p.instagram)}"></label></div><div class="field"><label>Facebook<input name="facebook" value="${esc(p.facebook)}"></label></div><div class="field"><label>Ordem<input name="order" type="number" value="${p.order||1}"></label></div><div class="field full"><label>Descrição<textarea name="description">${esc(p.description)}</textarea></label></div>${imageField('Logótipo',p.logo)}<label class="toggle"><input type="checkbox" name="active" ${p.active?'checked':''}> Ativo</label><div class="field full"><button class="admin-btn primary">GUARDAR PARCEIRO</button></div></form><img class="preview-img" id="partnerPreview" src="${esc(p.logo||'assets/logo.png')}"></div>`;$('#imageFile').onchange=async e=>{const f=e.target.files[0];if(f){try{const u=await uploadFile(f);$('#fieldImage').value=u;$('#partnerPreview').src=u;showToast('Logótipo enviado para o R2')}catch(err){showToast(err.message)}}};$('#partnerForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.currentTarget),o={...p,name:f.get('name'),category:f.get('category'),website:f.get('website'),instagram:f.get('instagram'),facebook:f.get('facebook'),order:Number(f.get('order')||1),description:f.get('description'),logo:f.get('fieldImage')||p.logo,active:f.get('active')==='on'};const i=data.partners.findIndex(x=>x.id===p.id);if(i>=0)data.partners[i]=o;else data.partners.push(o);save();renderPartners()}}
+function renderNews(){ $('#view-news').innerHTML=`<div class="toolbar"><h2 style="font:700 32px 'Barlow Condensed';margin:0">NOTÍCIAS</h2><button class="admin-btn primary" id="addNews">+ NOVA NOTÍCIA</button></div><div id="newsEditor"></div><div class="table-wrap"><table class="admin-table"><thead><tr><th>DATA</th><th>TÍTULO</th><th>CATEGORIA</th><th>PUBLICADO</th><th>AÇÕES</th></tr></thead><tbody>${data.news.sort((a,b)=>b.date.localeCompare(a.date)).map(n=>`<tr><td>${fmt(n.date)}</td><td>${esc(n.title)}</td><td>${esc(n.category)}</td><td>${n.published?'SIM':'NÃO'}</td><td><button class="admin-btn" data-edit-news="${n.id}">EDITAR</button> <button class="admin-btn danger" data-del-news="${n.id}">APAGAR</button></td></tr>`).join('')}</tbody></table></div>`;$('#addNews').onclick=()=>newsForm();$$('[data-edit-news]').forEach(b=>b.onclick=()=>newsForm(b.dataset.editNews));$$('[data-del-news]').forEach(b=>b.onclick=()=>{if(confirm('Apagar notícia?')){data.news=data.news.filter(x=>x.id!==b.dataset.delNews);save();renderNews()}})}
+function newsForm(id){const n=id?data.news.find(x=>x.id===id):{id:uid('n'),title:'',summary:'',content:'',date:'',category:'Notícias',image:'',published:false};$('#newsEditor').innerHTML=`<div class="panel"><form id="newsForm" class="form-grid"><div class="field full"><label>Título<input name="title" value="${esc(n.title)}"></label></div><div class="field"><label>Data<input name="date" type="date" value="${esc(n.date)}"></label></div><div class="field"><label>Categoria<select name="category">${['Rallycross','Motorsport','Eventos','Fotografia','Parceiros','Notícias'].map(x=>`<option ${n.category===x?'selected':''}>${x}</option>`).join('')}</select></label></div><div class="field full"><label>Resumo<textarea name="summary">${esc(n.summary)}</textarea></label></div><div class="field full"><label>Conteúdo<textarea name="content" style="min-height:180px">${esc(n.content)}</textarea></label></div>${imageField('Imagem',n.image)}<label class="toggle"><input type="checkbox" name="published" ${n.published?'checked':''}> Publicado</label><div class="field full"><button class="admin-btn primary">GUARDAR NOTÍCIA</button></div></form><img class="preview-img" id="newsPreview" src="${esc(n.image||'assets/placeholder-rally.svg')}"></div>`;$('#imageFile').onchange=async e=>{const f=e.target.files[0];if(f){try{const u=await uploadFile(f);$('#fieldImage').value=u;$('#newsPreview').src=u;showToast('Imagem enviada para o R2')}catch(err){showToast(err.message)}}};$('#newsForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.currentTarget),o={...n,title:f.get('title'),date:f.get('date'),category:f.get('category'),summary:f.get('summary'),content:f.get('content'),image:f.get('fieldImage')||n.image,published:f.get('published')==='on'};const i=data.news.findIndex(x=>x.id===n.id);if(i>=0)data.news[i]=o;else data.news.push(o);save();renderNews()}}
+function renderContact(){ $('#view-contact').innerHTML=`<div class="panel"><h2>Mensagens recebidas</h2>${data.messages.length?data.messages.slice().reverse().map(m=>`<div style="padding:15px 0;border-bottom:1px solid #222"><strong>${esc(m.name)}</strong> <span style="color:#666">(${esc(m.email)})</span><div style="font-size:10px;color:#777">${esc(m.subject)} • ${new Date(m.date).toLocaleString('pt-PT')}</div><p style="color:#aaa;line-height:1.6">${esc(m.message)}</p><button class="admin-btn danger" data-del-msg="${m.id}">APAGAR</button></div>`).join(''):'<div class="empty">Sem mensagens.</div>'}</div>`;$$('[data-del-msg]').forEach(b=>b.onclick=()=>{data.messages=data.messages.filter(m=>m.id!==b.dataset.delMsg);save();renderContact()})}
+function renderSocial(){const s=data.settings;$('#view-social').innerHTML=`<div class="panel"><h2>Redes sociais</h2><form id="socialForm" class="form-grid"><div class="field"><label>Instagram<input name="instagram" value="${esc(s.instagram)}"></label></div><div class="field"><label>Facebook<input name="facebook" value="${esc(s.facebook)}"></label></div><div class="field"><label>Email<input name="email" value="${esc(s.email)}"></label></div><div class="field"><label>Localização<input name="location" value="${esc(s.location)}"></label></div><div class="field full"><button class="admin-btn primary">GUARDAR</button></div></form></div>`;$('#socialForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.currentTarget);Object.assign(data.settings,Object.fromEntries(f.entries()));save()}}
+function renderSettings(){const s=data.settings;$('#view-settings').innerHTML=`<div class="panel"><h2>Configurações</h2><form id="settingsForm" class="form-grid"><div class="field"><label>Nome do site<input name="siteName" value="${esc(s.siteName)}"></label></div><div class="field"><label>Logótipo<input name="logo" value="${esc(s.logo)}"></label></div><div class="field full"><label>Nova palavra-passe<input name="password" type="password" placeholder="Deixa vazio para manter a atual"></label></div><div class="field full"><p style="color:#777;font-size:10px">Nota: A autenticação é feita pelo backend Cloudflare Worker; a palavra-passe não fica exposta no HTML.</p><button class="admin-btn primary">GUARDAR CONFIGURAÇÕES</button></div></form></div>`;$('#settingsForm').onsubmit=e=>{e.preventDefault();const f=new FormData(e.currentTarget);data.settings.siteName=f.get('siteName');data.settings.logo=f.get('logo');if(f.get('password'))data.settings.password=f.get('password');save()}}
+function ensureData(){
+  if(!storageGet(STORE_KEY)){
+    const initial=clone(defaults);
+    initial.races=[
+      {id:uid('r'),name:'RALLYCROSS PORTUGAL',date:'2027-06-20',endDate:'2027-06-21',location:'Montalegre',circuit:'Circuito de Montalegre',country:'Portugal',category:'SuperCars',status:'next',image:'assets/placeholder-rally.svg',description:'Fim de semana de Rallycross em Montalegre.',link:'',result:''},
+      {id:uid('r'),name:'MOTORSPORT FEST',date:'2027-07-11',endDate:'2027-07-11',location:'Lousada',circuit:'Circuito de Lousada',country:'Portugal',category:'Touring',status:'featured',image:'assets/placeholder-rally.svg',description:'Festival de Motorsport e ação em pista.',link:'',result:''},
+      {id:uid('r'),name:'RALLYCROSS IBÉRICO',date:'2027-08-08',endDate:'2027-08-08',location:'Fafe',circuit:'Circuito de Fafe',country:'Portugal',category:'Super1600',status:'upcoming',image:'assets/placeholder-rally.svg',description:'Etapa do calendário ibérico.',link:'',result:''}
+    ];
+    initial.photos=[{id:uid('p'),title:'Ataque na curva',category:'Rallycross',event:'Rallycross Portugal',driver:'Piloto / Equipa',date:'2027-06-20',location:'Montalegre',description:'Imagem de exemplo.',image:'assets/placeholder-rally.svg',featured:true,order:1}];
+    storageSet(STORE_KEY,JSON.stringify(initial));
+  }
+}
+async function cloudLoad(){const token=sessionGet('tp_admin_token');if(!token)return false;const r=await fetch('/api/admin/data',{headers:{Authorization:'Bearer '+token}});if(!r.ok){sessionRemove('tp_admin_token');return false;}data=await r.json();storageSet(STORE_KEY,JSON.stringify(data));return true;}
+async function loginRemote(password){const r=await fetch('/api/auth/login',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password})});const j=await r.json().catch(()=>({}));if(!r.ok)throw new Error(j.error||'Não foi possível iniciar sessão.');sessionSet('tp_admin_token',j.token);return cloudLoad();}
+function start(){
+  try{
+    const form=$('#loginForm'), pass=$('#adminPassword');
+    if(!form||!pass) throw new Error('Formulário de login não encontrado.');
+    form.addEventListener('submit',async e=>{
+      e.preventDefault(); e.stopPropagation();
+      try { await loginRemote(String(pass.value||'')); sessionSet('tp_admin_ok','1'); $('#loginView').hidden=true; $('#adminView').hidden=false; setActive('dashboard'); }
+      catch(err){ showToast(err.message); pass.focus(); pass.select(); }
+      return false;
+    });
+    $('#logoutBtn').onclick=()=>{sessionRemove('tp_admin_ok');sessionRemove('tp_admin_token');location.reload()};
+    $$('#adminNav button').forEach(b=>b.onclick=()=>setActive(b.dataset.view));
+    if(sessionGet('tp_admin_token') && sessionGet('tp_admin_ok')==='1') cloudLoad().then(ok=>{if(ok){$('#loginView').hidden=true;$('#adminView').hidden=false;setActive('dashboard')} });
+  }catch(err){
+    console.error(err); const msg=document.createElement('div'); msg.style='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#4b1515;color:#fff;border:1px solid #8d2d2d;padding:12px 16px;font:12px Inter,Arial;z-index:9999'; msg.textContent='Erro ao iniciar o Admin: '+(err?.message||err); document.body.appendChild(msg);
+  }
+}
+start();
