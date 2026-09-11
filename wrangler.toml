@@ -2,12 +2,10 @@ name = "telmo-partilhas"
 pages_build_output_dir = "."
 compatibility_date = "2026-09-11"
 
-[[d1_databases]]
-binding = "DB"
-database_name = "telmo-partilhas-db"
-database_id = "<CRIAR_NO_CLOUDFLARE>"
-
-# Opcional para guardar uploads de fotografias.
-[[r2_buckets]]
-binding = "MEDIA"
-bucket_name = "<CRIAR_NO_CLOUDFLARE>"
+# IMPORTANTE:
+# As ligações D1 e R2 são configuradas no painel da Cloudflare Pages.
+# Não coloques IDs/bucket names fictícios aqui: o Wrangler recusa placeholders.
+#
+# Depois de criares/selecionares os recursos na Cloudflare, adiciona os bindings:
+# D1: binding = DB   -> a tua base de dados
+# R2: binding = MEDIA -> o teu bucket de imagens
