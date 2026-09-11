@@ -1,3 +1,0 @@
-import{json,makeSession,sessionCookie,clearSessionCookie}from'./_utils.js';
-export async function onRequestPost({request,env}){if(!env.ADMIN_PASSWORD)return json({ok:false,error:'ADMIN_PASSWORD não configurada no Cloudflare.'},503);let body;try{body=await request.json()}catch{return json({ok:false,error:'Pedido inválido.'},400)}if(body.password!==env.ADMIN_PASSWORD)return json({ok:false,error:'Password incorreta.'},401);const token=await makeSession(env.ADMIN_PASSWORD);return json({ok:true},200,{'Set-Cookie':sessionCookie(token)})}
-export async function onRequestDelete(){return json({ok:true},200,{'Set-Cookie':clearSessionCookie()})}
