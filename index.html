@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f6f4">
+  <meta name="description" content="Telmo Partilhas — Rallycross, Motorsport e Photography.">
+  <title>Telmo Partilhas | Rallycross • Motorsport • Photography</title>
+  <link rel="stylesheet" href="css/site.css">
+</head>
+<body>
+  <div class="site-noise" aria-hidden="true"></div>
+  <header class="site-header">
+    <a class="brand" href="#inicio" aria-label="Telmo Partilhas">
+      <img src="assets/logo.jpg" alt="Telmo Partilhas">
+    </a>
+    <button class="menu-toggle" id="menuToggle" aria-label="Abrir menu" aria-expanded="false"><span></span><span></span><span></span></button>
+    <nav class="main-nav" id="mainNav">
+      <a href="#inicio">Início</a>
+      <a href="#sobre">Sobre</a>
+      <a href="#calendario">Calendário</a>
+      <a href="#galeria">Galeria</a>
+      <a href="#parceiros">Parceiros</a>
+      <a href="#noticias">Notícias</a>
+      <a href="#contactos">Contactos</a>
+      <a class="nav-cta" href="#galeria">Ver galeria <span>↗</span></a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero section" id="inicio">
+      <div class="hero-backdrop"></div>
+      <div class="hero-grid"></div>
+      <div class="hero-content container reveal">
+        <div class="eyebrow"><span></span> RALLYCROSS · MOTORSPORT · PHOTOGRAPHY</div>
+        <h1 id="heroTitle">O Rallycross <em>através da minha lente.</em></h1>
+        <p id="heroSubtitle">Fotografia de Rallycross, Motorsport e momentos que ficam para a história.</p>
+        <div class="hero-actions">
+          <a class="btn btn-primary" href="#galeria">Ver fotografias <b>↗</b></a>
+          <a class="btn btn-ghost" href="#calendario">Calendário de provas <b>→</b></a>
+        </div>
+        <div class="hero-tags"><span>RALLYCROSS</span><span>MOTORSPORT</span><span>PHOTOGRAPHY</span></div>
+      </div>
+      <div class="hero-scroll">SCROLL <span></span></div>
+      <div class="hero-index">01 <i></i> 07</div>
+    </section>
+
+    <section class="marquee" aria-label="Telmo Partilhas">
+      <div class="marquee-track"><span>RALLYCROSS</span><b>✦</b><span>MOTORSPORT</span><b>✦</b><span>PHOTOGRAPHY</span><b>✦</b><span>RALLYCROSS</span><b>✦</b><span>MOTORSPORT</span><b>✦</b><span>PHOTOGRAPHY</span><b>✦</b></div>
+    </section>
+
+    <section class="section intro-section" id="sobre">
+      <div class="container split-head">
+        <div class="section-kicker">01 / SOBRE</div>
+        <div><h2>Sobre o meu <em>trabalho.</em></h2><p class="lede" id="aboutText">Acompanhar provas, pilotos, equipas e eventos de Motorsport através da fotografia — procurando velocidade, emoção, detalhe e os momentos que merecem ficar registados.</p></div>
+      </div>
+      <div class="container stats-grid" id="statsGrid"></div>
+    </section>
+
+    <section class="section next-race" id="proxima">
+      <div class="container section-label-row"><span>02 / PRÓXIMA PROVA</span><span class="live-chip">AO VIVO EM BREVE</span></div>
+      <div class="container next-race-card">
+        <div class="race-media" id="nextRaceMedia"><div class="race-overlay"></div><div class="race-stamp">NEXT<br>RACE</div></div>
+        <div class="race-info">
+          <div class="race-meta"><span id="nextCategory">RALLYCROSS</span><span>•</span><span id="nextCountry">PORTUGAL</span></div>
+          <h2 id="nextName">Rallycross Portugal</h2>
+          <p class="race-location" id="nextLocation">Circuito de Montalegre</p>
+          <div class="race-date" id="nextDate">20 — 21 JUNHO 2027</div>
+          <div class="countdown" id="countdown"></div>
+          <div class="race-details"><div><span>LOCAL</span><b id="nextCircuit">Montalegre</b></div><div><span>CATEGORIA</span><b id="nextCategory2">Rallycross</b></div><div><span>ESTADO</span><b class="accent">PRÓXIMA</b></div></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section calendar-section" id="calendario">
+      <div class="container section-head"><div><div class="section-kicker">03 / CALENDÁRIO</div><h2>Calendário de <em>provas.</em></h2></div><p>Consulta as provas acompanhadas, próximas datas e destaques de temporada.</p></div>
+      <div class="container filter-row" id="calendarFilters"></div>
+      <div class="container timeline" id="calendarList"></div>
+    </section>
+
+    <section class="section gallery-section" id="galeria">
+      <div class="container section-head"><div><div class="section-kicker">04 / GALERIA</div><h2>Momentos em <em>movimento.</em></h2></div><p>Uma seleção de Rallycross, Motorsport, pilotos, equipas e bastidores.</p></div>
+      <div class="container gallery-tools"><div class="filter-row" id="galleryFilters"></div><label class="search-field"><span>⌕</span><input id="gallerySearch" type="search" placeholder="Pesquisar fotografia..."></label></div>
+      <div class="container gallery-grid" id="galleryGrid"></div>
+    </section>
+
+    <section class="section shot-section" id="shot">
+      <div class="container shot-card" id="shotCard"></div>
+    </section>
+
+    <section class="section partners-section" id="parceiros">
+      <div class="container section-head"><div><div class="section-kicker">05 / PARCEIROS</div><h2>Parceiros que tornam este projeto <em>possível.</em></h2></div><p>Marcas e projetos que partilham a paixão por Motorsport e tornam cada cobertura possível.</p></div>
+      <div class="container partners-grid" id="partnersGrid"></div>
+    </section>
+
+    <section class="section news-section" id="noticias">
+      <div class="container section-head"><div><div class="section-kicker">06 / NOTÍCIAS</div><h2>Últimas <em>notícias.</em></h2></div><p>Atualizações de provas, fotografia, projetos e parceiros.</p></div>
+      <div class="container news-grid" id="newsGrid"></div>
+    </section>
+
+    <section class="section results-section" id="resultados">
+      <div class="container section-head"><div><div class="section-kicker">07 / RESULTADOS</div><h2>Resultados <em>em destaque.</em></h2></div><p>Classificações e registos associados às provas fotografadas.</p></div>
+      <div class="container results-tools"><select id="resultYear"><option value="all">Todos os anos</option></select><select id="resultCategory"><option value="all">Todas as categorias</option></select><select id="resultRace"><option value="all">Todas as provas</option></select></div>
+      <div class="container results-table-wrap"><table><thead><tr><th>Prova</th><th>Data</th><th>Piloto</th><th>Categoria</th><th>Pos.</th><th>Tempo</th><th>Observações</th></tr></thead><tbody id="resultsBody"></tbody></table></div>
+    </section>
+
+    <section class="section contact-section" id="contactos">
+      <div class="container contact-grid">
+        <div><div class="section-kicker">08 / CONTACTOS</div><h2>Vamos falar de <em>Motorsport.</em></h2><p class="lede">Queres cobertura fotográfica, parceria ou simplesmente acompanhar o projeto? Envia uma mensagem.</p><div class="contact-list" id="contactList"></div></div>
+        <form id="contactForm" class="contact-form"><div class="form-row"><label>Nome<input name="name" required></label><label>Email<input name="email" type="email" required></label></div><label>Assunto<input name="subject" required></label><label>Mensagem<textarea name="message" rows="7" required></textarea></label><button class="btn btn-primary" type="submit">Enviar mensagem <b>↗</b></button><p class="form-note" id="formNote"></p></form>
+      </div>
+    </section>
+
+    <section class="section partner-cta"><div class="container partner-cta-inner"><div><div class="section-kicker">COLABORAÇÕES</div><h2>Queres colaborar ou ser <em>parceiro?</em></h2><p>Vamos criar uma presença Motorsport com imagem, consistência e impacto.</p></div><a class="btn btn-primary" href="#contactos">Falar sobre parcerias <b>↗</b></a></div></section>
+
+    <section class="section socials-section"><div class="container socials-inner"><div><div class="section-kicker">REDES SOCIAIS</div><h2>Segue o meu <em>trabalho.</em></h2></div><div class="social-links" id="socialLinks"></div></div></section>
+  </main>
+
+  <footer class="site-footer"><div class="container footer-grid"><div><img src="assets/logo.jpg" class="footer-logo" alt="Telmo Partilhas"><p>Rallycross · Motorsport · Photography</p></div><div class="footer-links"><a href="#inicio">Início</a><a href="#sobre">Sobre</a><a href="#calendario">Calendário</a><a href="#galeria">Galeria</a><a href="#parceiros">Parceiros</a><a href="#noticias">Notícias</a><a href="#contactos">Contactos</a><a href="admin.html">Admin</a></div><div class="footer-meta"><span>© <span id="footerYear">2027</span> Telmo Partilhas.</span><span>Todos os direitos reservados.</span></div></div></footer>
+
+  <div class="modal" id="modal" aria-hidden="true"><div class="modal-backdrop" data-close="1"></div><div class="modal-dialog"><button class="modal-close" id="modalClose" aria-label="Fechar">×</button><div id="modalBody"></div></div></div>
+  <script src="data/content.js"></script><script src="js/cloudflare-sync.js"></script><script src="js/site.js"></script>
+</body>
+</html>

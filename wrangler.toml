@@ -1,0 +1,13 @@
+name = "telmo-partilhas"
+pages_build_output_dir = "."
+compatibility_date = "2026-09-11"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "telmo-partilhas-db"
+database_id = "<CRIAR_NO_CLOUDFLARE>"
+
+# Opcional para guardar uploads de fotografias.
+[[r2_buckets]]
+binding = "MEDIA"
+bucket_name = "<CRIAR_NO_CLOUDFLARE>"
