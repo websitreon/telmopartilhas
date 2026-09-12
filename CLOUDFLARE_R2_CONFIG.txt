@@ -1,7 +1,0 @@
-TELMO PARTILHAS — R2
-
-Binding: MEDIA
-Bucket: telmo-partilhas-media
-
-O bucket já está declarado no wrangler.toml e no wrangler.pages.toml.
-Não alteres o nome do binding: o backend usa env.MEDIA.
