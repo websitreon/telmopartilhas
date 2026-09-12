@@ -1,0 +1,14 @@
+TELMO PARTILHAS V21 — DEPLOY
+
+1. Faz upload/publica a RAIZ deste pacote (não entres em nenhuma subpasta).
+2. O Build/Deploy deve executar: npx wrangler deploy
+3. D1: binding DB, database_id 80d0977f-5cd6-4efa-9e6e-e2656b6f9e59
+4. R2: binding MEDIA, bucket telmo-partilhas-media
+5. Secret: ADMIN_PASSWORD
+6. Não uses wrangler.pages.toml nem wrangler pages deploy neste pacote.
+
+Estrutura principal:
+public/ = site + admin + assets
+cloudflare/ = Worker + API
+database/ = migrations
+docs/ = documentação

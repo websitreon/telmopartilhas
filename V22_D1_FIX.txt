@@ -1,0 +1,13 @@
+TELMO PARTILHAS V22 — CORREÇÃO D1
+
+Esta versão mantém o deploy como Worker + Static Assets e adiciona uma migração automática e segura das colunas em falta nas tabelas D1 existentes.
+
+Isto resolve o caso em que o login funciona mas o Admin mostra “Falha ao ler a D1” devido a uma D1 antiga com tabelas/colunas incompletas.
+
+Bindings esperados:
+DB = 80d0977f-5cd6-4efa-9e6e-e2656b6f9e59
+MEDIA = telmo-partilhas-media
+ADMIN_PASSWORD = Secret configurado na Cloudflare
+
+Deploy:
+npx wrangler deploy
