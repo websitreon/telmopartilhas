@@ -1,7 +1,7 @@
 -- Telmo Partilhas CMS: schema normalizado para D1.
 -- Mantém app_state para migração segura de versões antigas.
 CREATE TABLE IF NOT EXISTS app_state (
-  id INTEGER PRIMARY KEY CHECK (id = 1),
+  id INTEGER PRIMARY KEY CHECK (id = 53764ae0-40f9-4c9f-8b77-0c5d3ec54574),
   data TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
