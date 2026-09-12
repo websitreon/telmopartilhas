@@ -1,0 +1,14 @@
+{
+  "name": "telmo-partilhas",
+  "private": true,
+  "version": "17.0.0",
+  "scripts": {
+    "build": "exit 0",
+    "dev": "wrangler pages dev .",
+    "deploy": "wrangler pages deploy . --project-name=telmo-partilhas",
+    "deploy:preview": "wrangler pages deploy . --project-name=telmo-partilhas --branch=preview"
+  },
+  "devDependencies": {
+    "wrangler": "^4.131.1"
+  }
+}
