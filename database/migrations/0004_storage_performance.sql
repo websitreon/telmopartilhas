@@ -1,0 +1,4 @@
+-- 0004: media storage/performance model
+-- New images and videos are stored in R2 via the existing media table.
+-- D1 d1_photos is retained only for backwards compatibility with legacy records.
+-- No schema change is required because media already supports media_type image/video.
