@@ -1,5 +1,0 @@
--- 0003_schema_repair.sql
--- Runtime ensureSchema() performs compatibility repair because D1 deployments may
--- already contain older tables that cannot be altered into the canonical primary-key
--- shape with CREATE TABLE IF NOT EXISTS. Keep this file as documentation for the
--- canonical schema; the Worker repairs existing incompatible tables automatically.
